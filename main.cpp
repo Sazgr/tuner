@@ -26,7 +26,7 @@ typedef uint64_t u64; //for bitboards
 constexpr double k = 0.0092;
 constexpr int king_len = 2 * 32 * 5 * 64;
 constexpr int mob_len = 66 + 36;
-constexpr int pawn_len = 6 * 8;
+constexpr int pawn_len = 8 * 8;
 constexpr int bishop_len = 1;
 constexpr int half = king_len + mob_len + pawn_len + bishop_len;
 constexpr int full = 2 * half;
@@ -184,17 +184,21 @@ const int eg_rook_fmobility[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 const int eg_queen_fmobility[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 const int mg_passed[8] = {0, -4, 16, 14, -2, -6, 1, 0};
+const int mg_blocked[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 const int mg_passed_free[8] = {0, -10, 0, 11, -8, -8, -1, 0};
 const int mg_doubled[8] = {0, 0, -2, 5, -7, -8, -3, 0};
 const int mg_isolated[8] = {0, 15, 3, -3, -17, -23, -15, 0};
 const int mg_supported[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int mg_passed_supported[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 const int mg_phalanx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 const int eg_passed[8] = {0, -37, 59, 43, 29, 16, 6, 0};
+const int eg_blocked[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 const int eg_passed_free[8] = {0, 43, 137, 65, 38, 13, 9, 0};
 const int eg_doubled[8] = {0, 0, 4, 0, -9, -10, -16, 0};
 const int eg_isolated[8] = {0, -7, -23, -20, -10, -12, -6, 0};
 const int eg_supported[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int eg_passed_supported[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 const int eg_phalanx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 const int mg_bishop_pair = 0;
@@ -325,23 +329,29 @@ bool Data::load_fen(vector<double>& params, string fen_pos, string fen_stm, stri
         switch (piece.second / 2) {
             case 0: //pawn
                 if (!(passed[piece.second][piece.first] & bb[piece.second ^ 1]) && !(doubled[piece.second][piece.first] & bb[piece.second])) {
+                    pawns.push_back(make_pair(piece.first >> 3, piece.second));
                     if (!(doubled[piece.second][piece.first] & bb[13 + (piece.second ^ 1)])) {
-                        pawns.push_back(make_pair(piece.first >> 3, piece.second + 2));
-                    } else {
-                        pawns.push_back(make_pair(piece.first >> 3, piece.second));
+                        pawns.push_back(make_pair(piece.first >> 3, piece.second + 4));
+                    }
+                    if (pawn_attacks[piece.second ^ 1][piece.first] & bb[piece.second]) {
+                        pawns.push_back(make_pair(piece.first >> 3, piece.second + 12));
+                    }
+                } else {
+                    if (pawn_attacks[piece.second ^ 1][piece.first] & bb[piece.second]) {
+                        pawns.push_back(make_pair(piece.first >> 3, piece.second + 10));
                     }
                 }
-                if (doubled[piece.second][piece.first] & bb[piece.second]) {
-                    pawns.push_back(make_pair(piece.first >> 3, piece.second + 4));
+                if (pawn_pushes[piece.second][piece.first] & king_attacks[piece.first] & bb[13 + (piece.second ^ 1)]) {
+                    pawns.push_back(make_pair(piece.first >> 3, piece.second + 2));
                 }
-                if (!(isolated[piece.first & 7] & bb[piece.second])) {
+                if (doubled[piece.second][piece.first] & bb[piece.second]) {
                     pawns.push_back(make_pair(piece.first >> 3, piece.second + 6));
                 }
-                if (pawn_attacks[piece.second ^ 1][piece.first] & bb[piece.second]) {
+                if (!(isolated[piece.first & 7] & bb[piece.second])) {
                     pawns.push_back(make_pair(piece.first >> 3, piece.second + 8));
                 }
                 if ((piece.first & 7) != 7 && (bb[piece.second] & (2ull << piece.first))) {
-                    pawns.push_back(make_pair(piece.first >> 3, piece.second + 10));
+                    pawns.push_back(make_pair(piece.first >> 3, piece.second + 14));
                 }
                 king.push_back(array<s8, 4>{0, ksq[0], piece.second, piece.first});
                 king.push_back(array<s8, 4>{1, ksq[1], piece.second, piece.first});
@@ -590,10 +600,12 @@ int main() {
     for (int i{}; i<8; ++i) {params.push_back(mg_rook_fmobility[i]);}
     for (int i{}; i<15; ++i) {params.push_back(mg_queen_fmobility[i]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_passed[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_blocked[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_passed_free[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_doubled[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_isolated[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_supported[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_passed_supported[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_phalanx[sq]);}
     params.push_back(mg_bishop_pair);
     /*for (int pc{}; pc<6; ++pc) {
@@ -617,10 +629,12 @@ int main() {
     for (int i{}; i<8; ++i) {params.push_back(eg_rook_fmobility[i]);}
     for (int i{}; i<15; ++i) {params.push_back(eg_queen_fmobility[i]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_passed[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_blocked[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_passed_free[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_doubled[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_isolated[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_supported[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_passed_supported[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_phalanx[sq]);}
     params.push_back(eg_bishop_pair);
     while ((fin >> tokens[0]) && (fin >> tokens[1]) && (fin >> tokens[2]) && (fin >> tokens[3]) && (fin >> tokens[4]) && (fin >> tokens[5]) && (fin >> tokens[6])) {
