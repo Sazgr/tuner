@@ -467,6 +467,14 @@ void compute_gradient(int n_threads, int offset, int start, vector<double>& grad
                 : (32 * 5 * 64 * (piece[0] ^ (piece[2] & 1)) + 5 * 64 * ((piece[2] & 1) ? compress(piece[1] ^ 0) : (compress(piece[1] ^ 0 ^ 56))) + 64 * (piece[2] / 2) + ((piece[2] & 1) ? (piece[3] ^ 0) : (piece[3] ^ 0 ^ 56)));
             gradient[param_id] += ((piece[2] & 1) * 2 - 1) * mg_base; //middlegame parameter
             gradient[half + param_id] += ((piece[2] & 1) * 2 - 1) * eg_base; //endgame parameter
+            for (u64 bb{king_attacks[piece[1]]}; bb;) {
+                int sq = pop_lsb(bb);
+                int param_id = ((sq & 7) >= 4)
+                    ? (32 * 5 * 64 * (piece[0] ^ (piece[2] & 1)) + 5 * 64 * ((piece[2] & 1) ? compress(sq ^ 7) : (compress(sq ^ 7 ^ 56))) + 64 * (piece[2] / 2) + ((piece[2] & 1) ? (piece[3] ^ 7) : (piece[3] ^ 7 ^ 56)))
+                    : (32 * 5 * 64 * (piece[0] ^ (piece[2] & 1)) + 5 * 64 * ((piece[2] & 1) ? compress(sq ^ 0) : (compress(sq ^ 0 ^ 56))) + 64 * (piece[2] / 2) + ((piece[2] & 1) ? (piece[3] ^ 0) : (piece[3] ^ 0 ^ 56)));
+                gradient[param_id] += 0.02 * ((piece[2] & 1) * 2 - 1) * mg_base; //middlegame parameter
+                gradient[half + param_id] += 0.02 * ((piece[2] & 1) * 2 - 1) * eg_base; //endgame parameter
+        }
         }
         for (pair<s8, s8> mobile : this_pos.mob) {
             int param_id = king_len + mobile.second;
