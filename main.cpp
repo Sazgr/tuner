@@ -12,8 +12,8 @@ ifstream fin ("C:\\kyle\\chess2\\texel\\tuningsets\\lichess-big3-resolved.epd");
 //ifstream fin1 ("C:\\kyle\\chess2\\texel\\tuningsets\\pk-80k-r12-quiet.epd");
 //ifstream fin2 ("C:\\kyle\\chess2\\texel\\tuningsets\\pk-60k-r10-set1-quiet.epd");
 //ifstream fin3 ("C:\\kyle\\chess2\\texel\\tuningsets\\xxx.epd");
-ofstream fout ("C:\\Users\\kyley\\OneDrive\\Documents\\peacekeeper-tune-hce\\tables_raw.txt");
-ofstream e_out ("C:\\Users\\kyley\\OneDrive\\Documents\\peacekeeper-tune-hce\\e.txt");
+ofstream fout ("C:\\git\\tuner\\tables_raw.txt");
+ofstream e_out ("C:\\git\\tuner\\e.txt");
 ostream& out = cout;
 
 /**********************
