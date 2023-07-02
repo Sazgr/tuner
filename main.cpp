@@ -28,7 +28,8 @@ constexpr int king_len = 2 * 32 * 5 * 64;
 constexpr int mob_len = 66 + 36;
 constexpr int pawn_len = 6 * 8;
 constexpr int bishop_len = 1;
-constexpr int half = king_len + mob_len + pawn_len + bishop_len;
+constexpr int rook_len = 48;
+constexpr int half = king_len + mob_len + pawn_len + bishop_len + rook_len;
 constexpr int full = 2 * half;
 
 constexpr bool no_draws = false;
@@ -200,6 +201,20 @@ const int eg_phalanx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 const int mg_bishop_pair = 0;
 const int eg_bishop_pair = 0;
 
+const int mg_rook_open[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int mg_rook_semiopen[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int mg_queen_open[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int mg_queen_semiopen[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int mg_king_open[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int mg_king_semiopen[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+const int eg_rook_open[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int eg_rook_semiopen[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int eg_queen_open[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int eg_queen_semiopen[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int eg_king_open[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+const int eg_king_semiopen[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
 /*******************
 * BITBOARD ATTACKS *
 ********************/
@@ -270,6 +285,7 @@ struct Data {
     vector<pair<s8, s8>> mob;    //piece_type, mobility
     vector<pair<s8, s8>> pawns;   //square, piece_type
     vector<array<s8, 4>> king;   //king_color, king_square, piece_type, piece_square
+    vector<pair<s8, s8>> rook;   //type, file
     int b_p;
     int gp; //gamephase
     int tempo_bonus;
@@ -320,6 +336,11 @@ bool Data::load_fen(vector<double>& params, string fen_pos, string fen_stm, stri
         ++sq;
     }
     s8 ksq[2] = {static_cast<s8>(get_lsb(bb[10])), static_cast<s8>(get_lsb(bb[11]))};
+    int file_status[8] = {3, 3, 3, 3, 3, 3, 3, 3}; // 0 = open, 1=black pawn, 2=white pawn, 3=closed
+    for (int i{}; i<7; ++i) {
+        if (!(between[i][56 + i] & bb[0])) file_status[i] &= ~1;
+        if (!(between[i][56 + i] & bb[1])) file_status[i] &= ~2;
+    }
     u64 atts;
     for (pair<s8, s8> piece : pieces) {
         switch (piece.second / 2) {
@@ -366,6 +387,13 @@ bool Data::load_fen(vector<double>& params, string fen_pos, string fen_stm, stri
                 mob.push_back(make_pair(piece.second, 66 + 5 + 8 + popcount(atts &  forward_m[piece.second & 1][piece.first >> 3])));
                 king.push_back(array<s8, 4>{0, ksq[0], piece.second, piece.first});
                 king.push_back(array<s8, 4>{1, ksq[1], piece.second, piece.first});
+                if (!(file_status[piece.first % 8] & (1 << (piece.second - 6)))) {
+                    if (file_status[piece.first % 8] == 0) {
+                        rook.push_back({piece.second - 6, piece.first % 8});
+                    } else {
+                        rook.push_back({piece.second - 6, 8 + piece.first % 8});
+                    }
+                }
                 break;
             case 4: //queen
                 atts = queen_attacks(bb[12], piece.first) & ~bb[13 + (piece.second & 1)];
@@ -373,8 +401,22 @@ bool Data::load_fen(vector<double>& params, string fen_pos, string fen_stm, stri
                 mob.push_back(make_pair(piece.second, 66 + 5 + 8 + 8 + popcount(atts &  forward_m[piece.second & 1][piece.first >> 3])));
                 king.push_back(array<s8, 4>{0, ksq[0], piece.second, piece.first});
                 king.push_back(array<s8, 4>{1, ksq[1], piece.second, piece.first});
+                if (!(file_status[piece.first % 8] & (1 << (piece.second - 8)))) {
+                    if (file_status[piece.first % 8] == 0) {
+                        rook.push_back({piece.second - 6, piece.first % 8});
+                    } else {
+                        rook.push_back({piece.second - 6, 8 + piece.first % 8});
+                    }
+                }
                 break;
             case 5: //king
+                if (!(file_status[piece.first % 8] & (1 << (piece.second - 10)))) {
+                    if (file_status[piece.first % 8] == 0) {
+                        rook.push_back({piece.second - 6, piece.first % 8});
+                    } else {
+                        rook.push_back({piece.second - 6, 8 + piece.first % 8});
+                    }
+                }
                 break;
         }
     }
@@ -414,6 +456,11 @@ double Data::eval(const vector<double>& params) {
     }
     mg += b_p * params[king_len + mob_len + pawn_len];
     eg += b_p * params[half + king_len + mob_len + pawn_len];
+    for (pair<s8, s8> piece : rook) {
+        int param_id = king_len + mob_len + pawn_len + bishop_len + (piece.first / 2) * 16 + piece.second;
+        mg += ((piece.first & 1) * 2 - 1) * params[param_id]; //middlegame parameter
+        eg += ((piece.first & 1) * 2 - 1) * params[half + param_id]; //endgame parameter
+    }
     return (gp * mg + (24 - gp) * eg) / 24 + tempo_bonus;
 }
 
@@ -480,6 +527,11 @@ void compute_gradient(int n_threads, int offset, int start, vector<double>& grad
         }
         gradient[king_len + mob_len + pawn_len] += this_pos.b_p * mg_base;
         gradient[half + king_len + mob_len + pawn_len] += this_pos.b_p * eg_base;
+        for (pair<s8, s8> piece : this_pos.rook) {
+            int param_id = king_len + mob_len + pawn_len + bishop_len + (piece.first / 2) * 16 + piece.second;
+            gradient[param_id] += ((piece.first & 1) * 2 - 1) * mg_base; //middlegame parameter
+            gradient[half + param_id] += ((piece.first & 1) * 2 - 1) * eg_base; //endgame parameter
+        }
     }
 }
 
@@ -596,6 +648,12 @@ int main() {
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_supported[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(mg_phalanx[sq]);}
     params.push_back(mg_bishop_pair);
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_rook_open[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_rook_semiopen[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_queen_open[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_queen_semiopen[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_king_open[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(mg_king_semiopen[sq]);}
     /*for (int pc{}; pc<6; ++pc) {
         for (int sq{}; sq<64; ++sq) {
             params.push_back(eg_value[pc] + eg_table[pc][sq]);
@@ -623,6 +681,12 @@ int main() {
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_supported[sq]);}
     for (int sq{}; sq<8; ++sq) {params.push_back(eg_phalanx[sq]);}
     params.push_back(eg_bishop_pair);
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_rook_open[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_rook_semiopen[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_queen_open[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_queen_semiopen[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_king_open[sq]);}
+    for (int sq{}; sq<8; ++sq) {params.push_back(eg_king_semiopen[sq]);}
     while ((fin >> tokens[0]) && (fin >> tokens[1]) && (fin >> tokens[2]) && (fin >> tokens[3]) && (fin >> tokens[4]) && (fin >> tokens[5]) && (fin >> tokens[6])) {
         test_set.push_back(Data{});
         test_set.back().load_fen(params, tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]);
@@ -740,6 +804,11 @@ int main() {
         else fout << ' ';
     }
     fout << static_cast<int>(final_params[king_len + mob_len + pawn_len]) << "," << '\n';
+    for (int i{king_len + mob_len + pawn_len + bishop_len}; i < king_len + mob_len + pawn_len + bishop_len + rook_len; ++i) {
+        fout << static_cast<int>(final_params[i]) << ",";
+        if ((i - king_len - mob_len - pawn_len - bishop_len) % 8 == 7) fout << '\n';
+        else fout << ' ';
+    }
     cout << '\n';
     for (int i{half}; i < half + king_len; ++i) {
         fout << static_cast<int>(final_params[i]) /*-eg_value[(i - half)/64]*/ << ",";
@@ -757,6 +826,11 @@ int main() {
         else fout << ' ';
     }
     fout << static_cast<int>(final_params[half + king_len + mob_len + pawn_len]) << "," << '\n';
+    for (int i{half + king_len + mob_len + pawn_len + bishop_len}; i < half + king_len + mob_len + pawn_len + bishop_len + rook_len; ++i) {
+        fout << static_cast<int>(final_params[i]) << ",";
+        if ((i - half - king_len - mob_len - pawn_len - bishop_len) % 8 == 7) fout << '\n';
+        else fout << ' ';
+    }
     fout << flush;
     cin >> command;
     return 0;
